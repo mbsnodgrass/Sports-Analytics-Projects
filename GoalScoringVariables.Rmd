@@ -1,0 +1,148 @@
+---
+title: "RCodeMidterm"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r}
+#Import Packages
+
+library("xlsx")
+library("ggplot2")
+library("corrplot")
+```
+
+```{r}
+#Import Dataset
+
+PlayerData <- xlsx::read.xlsx("C:/Users/MaxBo/OneDrive/Documents/Classes Fall 23/Stats Sports/SportsStats/PlayerData.xlsx", sheetIndex = 1)
+```
+
+```{r}
+#Create scatterplot of Goals/Shot vs. Total Shots
+
+plot(PlayerData$Sh,PlayerData$G.Sh,xlab = "Shots",ylab = "Goals per Shot")
+```
+```{r}
+#Importing Cleaned and Final Dataset
+
+PlayerData1 <- xlsx::read.xlsx("C:/Users/MaxBo/OneDrive/Documents/Classes Fall 23/Stats Sports/PlayerData3.xlsx", sheetIndex = 1)
+```
+
+```{r}
+#Scatterplot comparing expected goals to actual goals among players. 
+
+plot(PlayerData1$Gls,PlayerData1$xG,xlab = "Goals",ylab = "Expected Goals")
+abline(a=0, b=1)
+```
+```{r}
+#Summary statistics of goals/shot and a goals/shot histogram.
+
+summary(PlayerData1$G.Sh)
+sd(PlayerData1$G.Sh, na.rm=TRUE)
+hist(PlayerData1$G.Sh, xlab = "Goals per Shot")
+```
+
+```{r}
+#Side by Side box plots comparing Finishing Rating and Shot Power Rating
+
+boxplot(PlayerData1$Finishing,PlayerData1$Power,
+        col='steelblue',
+        main='Finishing vs Shot Power',
+        xlab='Finishing                                             Shot Power',
+        ylab='Rating')
+```
+```{r}
+#Scatter plot of position and average shot distance.
+
+plot(PlayerData1$PosScale,PlayerData1$Dist,xlab = "Position Scale",ylab = "Average Shot Distance")
+```
+
+```{r}
+#Bar graph of position scale
+
+ggplot(PlayerData1, aes(x=PosScale)) +
+  geom_bar()
+```
+
+```{r}
+#Correlation Matrix of all predictor variables
+
+COR <- cor(PlayerData1[,c(3:6,9,11:12)])
+corrplot(COR, method = 'number')
+```
+
+```{r}
+#Regression including all 7 predictor variables.
+
+fullmodel = lm(G.Sh ~ 
+               + Dist + SoT.+ PosScale + Power + Age + Finishing + PKatt, data = PlayerData1)
+summary(fullmodel)
+```
+```{r}
+#Backwards elimination using AIC to eliminate insignificant variables
+
+require(MASS)
+fullmodel = step(fullmodel, direction = "backward")
+```
+```{r}
+#Partial F test to verify that PosScale is significant
+
+#Full model for hypothesis test
+model2 = lm(G.Sh ~  Dist + SoT. + PosScale, data = PlayerData1)
+anova(model2)
+
+#Reduced model for hypothesis test
+reducedmodel2 = lm(G.Sh ~ Dist + SoT., data = PlayerData1)
+anova(reducedmodel2)
+
+#Critical value calculation
+qf(.95,1,134)
+
+#Regression table of finalized model
+summary(model2)
+```
+
+```{r}
+#Creating confidence and prediction intervals for average player.
+
+#Obtaining average values for the three predictor variables
+summary(PlayerData1$PosScale)
+summary(PlayerData1$Dist)
+summary(PlayerData1$SoT.)
+
+#Creating small table with average player stats
+new_data = as.data.frame(t(c(18.25,35.68,3.486)))
+colnames(new_data) = c("Dist", "SoT.","PosScale")
+
+#Creation of confidence and prediction intervals
+confint = predict(model2, new_data, se.fit = TRUE, interval = "confidence")
+predint = predict(model2, new_data, se.fit = TRUE, interval = "prediction")
+print(confint$fit)
+print(predint$fit)
+```
+
+```{r}
+#Analysis of residuals
+
+#Creating residuals
+PlayerData1$residuals = residuals(model2)
+
+#Histogram of residuals
+hist(PlayerData1$residuals, xlab = "Residual")
+
+#Creating residual plot
+PlayerData1$pred = predict(model2)
+plot(PlayerData1$pred,PlayerData1$residuals,pch=19,xlab="Predicted Value",ylab="Residual",abline(a=0, b=0))
+```
+
+```{r}
+#Creating jackknife residuals to do a Shapiro-Wilk test
+
+PlayerData1$pred = predict(model2)
+PlayerData1$jackknife = rstudent(model2)
+shapiro.test(PlayerData1$jackknife)
+```
+
